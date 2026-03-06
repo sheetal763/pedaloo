@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 from scipy.fft import rfft, rfftfreq
 from sklearn.ensemble import RandomForestClassifier
+import bioread
+import tempfile
+import os
 
 
 # Bandpass Filter
@@ -33,7 +36,7 @@ def median_frequency(signal, fs):
 def analyze_emg(file):
 
     if file is None:
-        return "Please upload a TXT or CSV file", None, None
+        return "Please upload a TXT, CSV, or ACQ file", None, None
 
     try:
 
@@ -46,8 +49,17 @@ def analyze_emg(file):
         elif filename.endswith(".txt"):
             data = pd.read_csv(file.name, sep=None, engine="python", header=None)
 
+        elif filename.endswith(".acq"):
+            # Automatically convert ACQ to CSV
+            acq_data = bioread.read_file(file.name)
+            channel = acq_data.channels[0]
+            data = pd.DataFrame({
+                "time": channel.time_index,
+                "emg": channel.data
+            })
+
         else:
-            return "Unsupported file format. Upload .txt or .csv", None, None
+            return "Unsupported file format. Upload .txt, .csv, or .acq", None, None
 
 
         # keep numeric columns only
@@ -146,14 +158,14 @@ Muscle Condition Classification: {prediction}
 # Gradio UI
 interface = gr.Interface(
     fn=analyze_emg,
-    inputs=gr.File(label="Upload EMG File (.TXT or .CSV)"),
+    inputs=gr.File(label="Upload EMG File (.TXT, .CSV, or .ACQ)"),
     outputs=[
         gr.Textbox(label="EMG Analysis Result"),
         gr.Plot(label="Raw EMG Signal"),
         gr.Plot(label="RMS Envelope")
     ],
     title="EMG Fatigue Detection and Muscle Health Classification",
-    description="Upload a TXT or CSV EMG file containing Time and EMG amplitude columns."
+    description="Upload a TXT, CSV, or ACQ EMG file. ACQ files are automatically converted to CSV format."
 )
 
 interface.launch()
